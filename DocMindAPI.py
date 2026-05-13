@@ -1,32 +1,71 @@
-import anthropic
-import time
+# ─────────────────────────────────────────────────────────────
+# DocMind — Validação da API Claude
+# ─────────────────────────────────────────────────────────────
+# Alterações em relação ao código anterior:
+#
+# 1. A chave de API saiu do código e foi para o arquivo .env
+#    - ANTES: ANTHROPIC_API_KEY = "sk-ant-..." direto no código
+#    - DEPOIS: load_dotenv() + os.getenv("ANTHROPIC_API_KEY")
+#
+# 2. Adicionado o framework LangChain para comunicação com a API
+#    - ANTES: anthropic.Anthropic() chamado diretamente
+#    - DEPOIS: ChatAnthropic() via langchain_anthropic
+#
+# 3. Adicionado ChatPromptTemplate para estruturar o prompt
+#    - ANTES: mensagem fixa dentro do messages=[...]
+#    - DEPOIS: prompt template reutilizável com variável {pergunta}
+#
+# 4. Criação de uma chain (prompt | llm) conforme padrão LangChain
+#    - ANTES: cliente.messages.create(...)
+#    - DEPOIS: chain.invoke({"pergunta": ...})
+#
+# 5. Removida a biblioteca "time" (não necessária com LangChain)
+# ─────────────────────────────────────────────────────────────
 
-ANTHROPIC_API_KEY = "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"
+from dotenv import load_dotenv
+from langchain_anthropic import ChatAnthropic
+from langchain_core.prompts import ChatPromptTemplate
+import os
+
+# Carrega a chave do arquivo .env
+load_dotenv()
+api_key = os.getenv("ANTHROPIC_API_KEY")
 
 if __name__ == "__main__":
     print("=" * 50)
     print("  DocMind — Validação da API Claude")
     print("=" * 50)
 
-    cliente = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-    print("Conectando à API...")
-
-    inicio = time.time()
-    resposta = cliente.messages.create(
+    # Configuração do modelo via LangChain
+    llm = ChatAnthropic(
         model="claude-sonnet-4-6",
-        max_tokens=200,
-        messages=[
-            {"role": "user", "content": "Responda em português: Qual é o seu nome e o que você pode fazer?"}
-        ]
+        anthropic_api_key=api_key,
+        temperature=0.7
     )
-    fim = time.time()
 
-    print(f"\nResposta: {resposta.content[0].text}")
-    print(f"\nModelo        : {resposta.model}")
-    print(f"Tokens entrada: {resposta.usage.input_tokens}")
-    print(f"Tokens saída  : {resposta.usage.output_tokens}")
-    print(f"Tempo         : {fim - inicio:.2f}s")
+    # Template de prompt reutilizável
+    prompt = ChatPromptTemplate.from_template(
+        """
+        Você é o DocMind, um assistente especializado em análise de documentos PDF.
+        Responda sempre em português de forma clara e objetiva.
 
-    print("\n" + "=" * 50)
-    print("  API funcionando corretamente!")
-    print("=" * 50)
+        Pergunta:
+        {pergunta}
+        """
+    )
+
+# Criação da chain — encadeia o prompt com o modelo (prompt → llm)
+chain = prompt | llm
+ 
+# Entrada do usuário
+pergunta_usuario = input("Digite sua pergunta: ")
+ 
+# Execução da chain com a pergunta fornecida
+resposta = chain.invoke({
+    "pergunta": pergunta_usuario
+})
+ 
+# Exibe a resposta retornada pela IA
+print("\nResposta da IA:\n")
+print(resposta.content)
+ 
